@@ -1,0 +1,10 @@
+.react-quill {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.react-quill .ql-container {
+  flex: 1; /* Agar container konten mengambil seluruh tinggi yang tersedia */
+  overflow-y: auto; /* Tambahkan scroll jika kontennya melampaui area */
+}
