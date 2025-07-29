@@ -29,8 +29,7 @@ import { useSelector } from "react-redux";
 
 const { Text } = Typography;
 
-const FILE_TYPES = ["pdf", "jpg", "jpeg", "png"];
-const MAX_SIZE_MB = 4;
+// Remove file type restrictions - allow all file types
 const DOC_TYPES = [
   { key: "KK", label: "Kartu Keluarga" },
   { key: "Akta", label: "Akta Kelahiran" },
@@ -44,8 +43,12 @@ const DOC_TYPES = [
 const getFileIcon = (fileName) => {
   if (fileName.match(/\.(pdf)$/i))
     return <FilePdfOutlined style={{ color: "#d4380d" }} />;
-  if (fileName.match(/\.(jpg|jpeg|png)$/i))
+  if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i))
     return <FileImageOutlined style={{ color: "#1890ff" }} />;
+  if (fileName.match(/\.(doc|docx)$/i))
+    return <FilePdfOutlined style={{ color: "#1890ff" }} />;
+  if (fileName.match(/\.(xls|xlsx)$/i))
+    return <FilePdfOutlined style={{ color: "#52c41a" }} />;
   return <FileImageOutlined />;
 };
 
@@ -61,6 +64,8 @@ const Berkas = ({ value }) => {
   const [uploading, setUploading] = useState(false);
   const uploadRef = useRef({});
 
+  console.log(data);
+
   // Ambil data berkas dari value jika ada, jika tidak dari API
   const fileList =
     Array.isArray(value) && value.length > 0
@@ -75,37 +80,11 @@ const Berkas = ({ value }) => {
     return acc;
   }, {});
 
-  // Helper to get allowed file types for each docType
-  const getAcceptType = (docType) =>
-    docType === "Foto" ? ".jpg,.jpeg,.png" : ".pdf,.jpg,.jpeg,.png";
-
-  // Helper to check file type for Foto
-  const isFotoFileValid = (file) => {
-    const ext = file.name.split(".").pop().toLowerCase();
-    return ["jpg", "jpeg", "png"].includes(ext);
-  };
+  // Helper to get allowed file types for each docType - now accepts all files
+  const getAcceptType = (docType) => "*";
 
   const handleUpload = async (file, docType) => {
-    const ext = file.name.split(".").pop().toLowerCase();
-    // Validasi format file
-    if (docType === "Foto" && !["jpg", "jpeg", "png"].includes(ext)) {
-      message.error(
-        "Format file tidak sesuai! Foto hanya boleh JPG, JPEG, atau PNG."
-      );
-      return Upload.LIST_IGNORE;
-    }
-    if (!FILE_TYPES.includes(ext) || (docType === "Foto" && ext === "pdf")) {
-      message.error(
-        docType === "Foto"
-          ? "Format file tidak sesuai! Foto hanya boleh JPG, JPEG, atau PNG."
-          : "Format file tidak sesuai! Hanya PDF, JPG, JPEG, PNG yang diizinkan."
-      );
-      return Upload.LIST_IGNORE;
-    }
-    if (file.size / 1024 / 1024 > MAX_SIZE_MB) {
-      message.error(`Ukuran file maksimal ${MAX_SIZE_MB}MB.`);
-      return Upload.LIST_IGNORE;
-    }
+    // Remove all file type and size validations
     setUploading(true);
     const formData = new FormData();
     formData.append("name", docType);
@@ -141,49 +120,118 @@ const Berkas = ({ value }) => {
       disabled={uploading}
       style={{ marginBottom: 16 }}
     >
-      <p className="ant-upload-drag-icon">
+      <p className='ant-upload-drag-icon'>
         <UploadOutlined />
       </p>
-      <p className="ant-upload-text">
+      <p className='ant-upload-text'>
         Klik atau seret file ke sini untuk upload
       </p>
-      <p className="ant-upload-hint">
-        {docType === "Foto"
-          ? "Format: JPG, JPEG, PNG. Maksimal 4MB."
-          : "Format: PDF, JPG, JPEG, PNG. Maksimal 4MB."}
+      <p className='ant-upload-hint'>
+        Semua jenis file diizinkan. Tidak ada batasan ukuran file.
       </p>
     </Upload.Dragger>
   );
 
   const renderFileList = (docType) => {
     const file = filesByType[docType];
-    if (!file) return <Text type="secondary">Belum ada file diupload.</Text>;
+    const docLabel =
+      DOC_TYPES.find((doc) => doc.key === docType)?.label || docType;
+
+    if (!file) {
+      return (
+        <div style={{ textAlign: "center", padding: "20px" }}>
+          <Text type='secondary'>Berkas Belum diupload</Text>
+        </div>
+      );
+    }
     // Clean up file_link if it starts with undefined
     let fileLink = file.file_link;
     if (fileLink.startsWith("undefined/")) {
       fileLink = fileLink.replace("undefined/", "/");
     }
     // For Foto, show preview if image
-    if (docType === "Foto" && fileLink.match(/\.(jpg|jpeg|png)$/i)) {
+    if (
+      docType === "Foto" &&
+      fileLink.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)
+    ) {
       return (
+        <div>
+          <div style={{ marginBottom: 16, textAlign: "center" }}>
+            <Text strong>Preview Berkas {docLabel}</Text>
+          </div>
+          <List.Item
+            actions={[
+              <a href={fileLink} target='_blank' rel='noopener noreferrer'>
+                <Button icon={<DownloadOutlined />} size='small'>
+                  Download
+                </Button>
+              </a>,
+              <Popconfirm
+                title='Hapus file ini?'
+                onConfirm={() => handleDelete(file.id)}
+                okText='Ya'
+                cancelText='Batal'
+                disabled={isDeleting}
+              >
+                <Button
+                  icon={<DeleteOutlined />}
+                  danger
+                  size='small'
+                  loading={isDeleting}
+                >
+                  Hapus
+                </Button>
+              </Popconfirm>,
+            ]}
+          >
+            <List.Item.Meta
+              avatar={getFileIcon(fileLink)}
+              title={
+                <span>
+                  {file.file_name} <Tag color='green'>Sudah diupload</Tag>
+                </span>
+              }
+              description={
+                <img
+                  src={fileLink}
+                  alt='Preview Foto'
+                  style={{
+                    maxWidth: 120,
+                    maxHeight: 120,
+                    borderRadius: 8,
+                    marginTop: 8,
+                  }}
+                />
+              }
+            />
+          </List.Item>
+        </div>
+      );
+    }
+    // Default file display
+    return (
+      <div>
+        <div style={{ marginBottom: 16, textAlign: "center" }}>
+          <Text strong>Preview Berkas {docLabel}</Text>
+        </div>
         <List.Item
           actions={[
-            <a href={fileLink} target="_blank" rel="noopener noreferrer">
-              <Button icon={<DownloadOutlined />} size="small">
+            <a href={fileLink} target='_blank' rel='noopener noreferrer'>
+              <Button icon={<DownloadOutlined />} size='small'>
                 Download
               </Button>
             </a>,
             <Popconfirm
-              title="Hapus file ini?"
+              title='Hapus file ini?'
               onConfirm={() => handleDelete(file.id)}
-              okText="Ya"
-              cancelText="Batal"
+              okText='Ya'
+              cancelText='Batal'
               disabled={isDeleting}
             >
               <Button
                 icon={<DeleteOutlined />}
                 danger
-                size="small"
+                size='small'
                 loading={isDeleting}
               >
                 Hapus
@@ -195,69 +243,22 @@ const Berkas = ({ value }) => {
             avatar={getFileIcon(fileLink)}
             title={
               <span>
-                {file.file_name} <Tag color="green">Sudah diupload</Tag>
+                {file.file_name} <Tag color='green'>Sudah diupload</Tag>
               </span>
             }
             description={
-              <img
-                src={fileLink}
-                alt="Preview Foto"
-                style={{
-                  maxWidth: 120,
-                  maxHeight: 120,
-                  borderRadius: 8,
-                  marginTop: 8,
-                }}
-              />
+              <>
+                <Tag color='blue'>
+                  {fileLink.split(".").pop().toUpperCase()}
+                </Tag>
+                <span style={{ marginLeft: 8 }}>
+                  {(fileLink.match(/\d+MB/) || [])[0]}
+                </span>
+              </>
             }
           />
         </List.Item>
-      );
-    }
-    // Default file display
-    return (
-      <List.Item
-        actions={[
-          <a href={fileLink} target="_blank" rel="noopener noreferrer">
-            <Button icon={<DownloadOutlined />} size="small">
-              Download
-            </Button>
-          </a>,
-          <Popconfirm
-            title="Hapus file ini?"
-            onConfirm={() => handleDelete(file.id)}
-            okText="Ya"
-            cancelText="Batal"
-            disabled={isDeleting}
-          >
-            <Button
-              icon={<DeleteOutlined />}
-              danger
-              size="small"
-              loading={isDeleting}
-            >
-              Hapus
-            </Button>
-          </Popconfirm>,
-        ]}
-      >
-        <List.Item.Meta
-          avatar={getFileIcon(fileLink)}
-          title={
-            <span>
-              {file.file_name} <Tag color="green">Sudah diupload</Tag>
-            </span>
-          }
-          description={
-            <>
-              <Tag color="blue">{fileLink.split(".").pop().toUpperCase()}</Tag>
-              <span style={{ marginLeft: 8 }}>
-                {(fileLink.match(/\d+MB/) || [])[0]}
-              </span>
-            </>
-          }
-        />
-      </List.Item>
+      </div>
     );
   };
 
@@ -272,11 +273,10 @@ const Berkas = ({ value }) => {
               </span>
             </div>
             <div>
-              Semua file <b>WAJIB SCAN PDF</b>, Foto <b>JPG / JPEG / PNG</b>
+              Semua jenis file diizinkan. Tidak ada batasan ukuran file.
             </div>
             <div>
-              Foto 3x4 (max 4mb), SMP (Latar Merah Berseragam SD), SMA (Latar
-              Biru Berseragam SMP)
+              Pastikan file yang diupload sesuai dengan ketentuan yang diminta.
             </div>
           </div>
         </div>
@@ -286,7 +286,7 @@ const Berkas = ({ value }) => {
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
-        type="card"
+        type='card'
         items={DOC_TYPES.map((doc) => ({
           key: doc.key,
           label: (

@@ -31,22 +31,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // Maksimum ukuran file 10MB
-  },
-  fileFilter: (req, file, cb) => {
-    const fileTypes = /pdf|png|jpe?g/; // PDF, PNG, JPG, JPEG
-    const extName = fileTypes.test(
-      path.extname(file.originalname).toLowerCase()
-    );
-    const mimeType = fileTypes.test(file.mimetype);
-
-    if (extName && mimeType) {
-      return cb(null, true);
-    } else {
-      cb(new Error("Hanya file PDF, PNG, JPG, atau JPEG yang diizinkan"));
-    }
-  },
+  // Remove file size limit and file type filter to allow all files
 });
 
 // Status pendaftaran
@@ -94,7 +79,7 @@ router.get("/proses", authorize("admin"), async (req, res) => {
         LOWER(p.nama) LIKE $${paramCount} OR
         CAST(p.nisn AS TEXT) LIKE $${paramCount} OR
         LOWER(u.email) LIKE $${paramCount} OR
-        LOWER(u.username) LIKE $${paramCount}
+        LOWER(u.nama) LIKE $${paramCount}
       )`);
       queryParams.push(search);
       paramCount++;
@@ -470,7 +455,7 @@ router.post("/berkas", authorize("user"), upload.any(), async (req, res) => {
     const sanitizedUserName = req.user.nama.replace(/\s+/g, "_");
     const filePath = req.files[0].fieldname;
     const fileExtension = path.extname(req.files[0].originalname);
-    const fileLink = `${process.env.SERVER}/assets/berkas/${sanitizedUserName}/${sanitizedUserName}_${filePath}${fileExtension}`;
+    const fileLink = `/assets/berkas/${sanitizedUserName}/${sanitizedUserName}_${filePath}${fileExtension}`;
 
     const id = req.user.id;
     const file_name = req.body.name;
